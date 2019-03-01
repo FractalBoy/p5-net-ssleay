@@ -2542,6 +2542,10 @@ int
 SSL_SESSION_is_resumable(ses)
      SSL_SESSION *      ses
 
+SSL_SESSION *
+SSL_SESSION_dup(sess)
+     SSL_SESSION * sess
+
 #endif
 #if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER) /* OpenSSL 1.1.1 */
 
@@ -2553,34 +2557,48 @@ SSL_verify_client_post_handshake(SSL *ssl)
 
 #endif
 
+void
+i2d_SSL_SESSION(sess)
+	SSL_SESSION * sess
+    PPCODE:
+	STRLEN len;
+	unsigned char *pc,*pi;
+	if (!(len = i2d_SSL_SESSION(sess,NULL))) croak("invalid SSL_SESSION");
+	Newx(pc,len,unsigned char);
+	if (!pc) croak("out of memory");
+	pi = pc;
+	i2d_SSL_SESSION(sess,&pi);
+	XPUSHs(sv_2mortal(newSVpv((char*)pc,len)));
+	Safefree(pc);
+
+
+SSL_SESSION *
+d2i_SSL_SESSION(pv)
+	SV *pv
+    CODE:
+	RETVAL = NULL;
+	if (SvPOK(pv)) {
+	    const unsigned char *p;
+	    STRLEN len;
+	    p = (unsigned char*)SvPV(pv,len);
+	    RETVAL = d2i_SSL_SESSION(NULL,&p,len);
+	}
+    OUTPUT:
+	RETVAL
+
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)) || (LIBRESSL_VERSION_NUMBER >= 0x2070000fL)
+
 int
-i2d_SSL_SESSION(in,pp)
-     SSL_SESSION *      in
-     unsigned char *    &pp
+SSL_SESSION_up_ref(sess)
+     SSL_SESSION * sess
+
+#endif
 
 int
 SSL_set_session(to,ses)
      SSL *              to
      SSL_SESSION *      ses
 
-#if OPENSSL_VERSION_NUMBER < 0x0090707fL
-#define REM3 "NOTE: before 0.9.7g"
-
-SSL_SESSION *
-d2i_SSL_SESSION(a,pp,length)
-     SSL_SESSION *      &a
-     unsigned char *    &pp
-     long               length
-
-#else
-
-SSL_SESSION *
-d2i_SSL_SESSION(a,pp,length)
-     SSL_SESSION *      &a
-     const unsigned char *    &pp
-     long               length
-
-#endif
 #define REM30 "SSLeay-0.9.0 defines these as macros. I expand them here for safety's sake"
 
 SSL_SESSION *
@@ -3209,6 +3227,13 @@ X509_get_pubkey(X509 *x)
 
 ASN1_INTEGER *
 X509_get_serialNumber(X509 *x)
+
+#if (OPENSSL_VERSION_NUMBER >= 0x1010000fL && !defined(LIBRESSL_VERSION_NUMBER)) || (LIBRESSL_VERSION_NUMBER >= 0x2080100fL)
+
+const ASN1_INTEGER *
+X509_get0_serialNumber(const X509 *x)
+
+#endif
 
 int
 X509_set_serialNumber(X509 *x, ASN1_INTEGER *serial)
@@ -5915,6 +5940,46 @@ PEM_read_bio_X509_CRL(bio,x=NULL,cb=NULL,u=NULL)
 
 X509 *
 PEM_read_bio_X509(BIO *bio,void *x=NULL,void *cb=NULL,void *u=NULL)
+
+STACK_OF(X509_INFO) *
+PEM_X509_INFO_read_bio(bio, stack=NULL, cb=NULL, u=NULL)
+    BIO * bio
+    STACK_OF(X509_INFO) * stack
+    pem_password_cb * cb
+    void * u
+
+int
+sk_X509_INFO_num(stack)
+    STACK_OF(X509_INFO) * stack
+
+X509_INFO *
+sk_X509_INFO_value(stack, index)
+    const STACK_OF(X509_INFO) * stack
+    int index
+
+void
+sk_X509_INFO_free(stack)
+    STACK_OF(X509_INFO) * stack
+
+STACK_OF(X509) *
+sk_X509_new_null()
+
+void
+sk_X509_free(stack)
+    STACK_OF(X509) * stack
+
+int
+sk_X509_push(stack, data)
+    STACK_OF(X509) * stack
+    X509 * data
+
+X509 *
+P_X509_INFO_get_x509(info)
+        X509_INFO * info
+    CODE:
+        RETVAL = info->x509;
+    OUTPUT:
+        RETVAL
 
 X509_REQ *
 PEM_read_bio_X509_REQ(BIO *bio,void *x=NULL,pem_password_cb *cb=NULL,void *u=NULL)
